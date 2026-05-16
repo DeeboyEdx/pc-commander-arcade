@@ -1,7 +1,7 @@
 // Functional test — actually drive the games for a few seconds and confirm no errors.
 
 const { chromium } = require('playwright');
-const BASE = 'http://127.0.0.1:8765';
+const BASE = process.env.BASE_URL || 'http://127.0.0.1:8765';
 
 (async () => {
   const browser = await chromium.launch();

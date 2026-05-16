@@ -4,7 +4,7 @@
 
 const { chromium } = require('playwright');
 
-const BASE = 'http://127.0.0.1:8765';
+const BASE = process.env.BASE_URL || 'http://127.0.0.1:8765';
 
 const PAGES = [
   { url: '/index.html',                  required: ['.marquee h1', '.game-grid', '.game-tile'] },
