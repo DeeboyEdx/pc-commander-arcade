@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PC Commander Arcade 🕹️</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A retro neon arcade inspired by the PC Commander Alexa skill. Defend your PC from spam pushes, play voice-driven Simon Says, and turn your voice into cosmic constellations.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/arcade.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230a0420'/%3E%3Ctext x='50%25' y='58%25' font-size='42' text-anchor='middle' font-family='Arial' fill='%23ff2bd6'%3E🕹%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <div id="navHost"></div>
+
+  <div class="page">
+
+    <div id="navHost-top"></div>
+
+    <div class="marquee">
+      <h1>PC Commander Arcade</h1>
+      <div class="subtitle flicker">▸ INSERT&nbsp;COIN&nbsp;TO&nbsp;CONTINUE ▸</div>
+    </div>
+
+    <p class="center" style="font-size:1.2rem;">
+      A neon-soaked tribute to the
+      <a href="about.html">PC Commander</a>
+      Alexa skill — except this time, <span class="glow-pink">you're</span> the one giving the orders.
+    </p>
+
+    <div class="game-grid">
+      <a class="game-tile pink" href="games/push-defender.html">
+        <span class="badge">ARCADE</span>
+        <span class="icon">🛡️</span>
+        <div class="title">Push Defender</div>
+        <div class="desc">Spam pushes are flooding the wire. Blast the bad ones, let the real ones through, and keep your PC alive through endless waves.</div>
+      </a>
+
+      <a class="game-tile cyan" href="games/voice-commander.html">
+        <span class="badge">VOICE</span>
+        <span class="icon">🎤</span>
+        <div class="title">Voice Commander</div>
+        <div class="desc">Alexa-style Simon Says. Repeat her commands in 6 languages using your microphone (or fall back to keyboard). Brief mode optional.</div>
+      </a>
+
+      <a class="game-tile green" href="games/echo-synth.html">
+        <span class="badge">CREATE</span>
+        <span class="icon">✨</span>
+        <div class="title">Echo Synth</div>
+        <div class="desc">Speak or type and watch your words become a glowing constellation drifting across the synthwave sky. Save it as a poster.</div>
+      </a>
+
+      <a class="game-tile yellow" href="about.html">
+        <span class="badge">INFO</span>
+        <span class="icon">🏆</span>
+        <div class="title">Hall of Pushes</div>
+        <div class="desc">Your high scores, your achievements, and the story behind this arcade. Built with love over one night while the user slept.</div>
+      </a>
+    </div>
+
+    <section class="mt-4">
+      <h2 class="center">▣ How to play</h2>
+      <div class="row">
+        <div class="card cyan" style="flex:1; min-width:260px;">
+          <h3>🎮 Controls</h3>
+          <p>Most games support <kbd>WASD</kbd> / <kbd>ARROWS</kbd> + <kbd>SPACE</kbd>. Voice games need microphone permission (works best in Chrome / Edge).</p>
+        </div>
+        <div class="card pink" style="flex:1; min-width:260px;">
+          <h3>🔊 Sound</h3>
+          <p>All audio is synthesized live with the Web Audio API — no MP3s, no samples. Toggle music & SFX inside each game.</p>
+        </div>
+        <div class="card green" style="flex:1; min-width:260px;">
+          <h3>💾 Progress</h3>
+          <p>High scores and achievements live in your browser via <code>localStorage</code>. No accounts, no tracking, no cloud.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mt-4 center">
+      <p class="muted">
+        Inspired by the <strong class="glow-cyan">PC Commander</strong> Alexa skill.<br>
+        This arcade is an independent fan project — no real push notifications are sent. 🛰️
+      </p>
+    </section>
+
+  </div>
+
+  <script src="assets/js/arcade.js"></script>
+  <script src="assets/js/sfx.js"></script>
+  <script>
+    PCCA.injectNav('home');
+    // No music on the landing page — it's the attract screen. Hover blip for fun:
+    document.querySelectorAll('.game-tile').forEach(t => {
+      t.addEventListener('mouseenter', () => SFX.blip());
+      t.addEventListener('click', () => SFX.coin());
+    });
+    // Replace navHost-top placeholder if present (legacy)
+    const stub = document.getElementById('navHost-top');
+    if (stub) stub.remove();
+
+    // ---- Konami code easter egg ----
+    const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    let kIdx = 0;
+    function rainbowAttack() {
+      const tiles = document.querySelectorAll('.game-tile, .marquee');
+      const colors = ['#ff2bd6','#ffe600','#39ff14','#00f0ff','#b026ff','#ff7a18'];
+      let step = 0;
+      const id = setInterval(() => {
+        tiles.forEach((t, i) => {
+          const c = colors[(step + i) % colors.length];
+          t.style.boxShadow = `0 0 32px ${c}, 0 0 64px ${c}`;
+          t.style.borderColor = c;
+        });
+        step++;
+        if (step > 40) {
+          clearInterval(id);
+          tiles.forEach(t => { t.style.boxShadow=''; t.style.borderColor=''; });
+        }
+      }, 110);
+      // Fanfare
+      ['c5','e5','g5','c6'].forEach((_, i) => setTimeout(() => SFX.levelup(), i * 200));
+      PCCA.toast('★ KONAMI ★', 'Welcome, fellow arcade dweller.');
+      // Award an extra achievement that isn't in the normal pool:
+      const s = PCCA.state();
+      if (!s.achievements.konami) {
+        s.achievements.konami = new Date().toISOString();
+        PCCA.patch({ achievements: s.achievements });
+      }
+    }
+    window.addEventListener('keydown', (e) => {
+      const want = KONAMI[kIdx];
+      const got = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (got === want) {
+        kIdx++;
+        if (kIdx === KONAMI.length) { kIdx = 0; rainbowAttack(); }
+      } else {
+        kIdx = (got === KONAMI[0]) ? 1 : 0;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Echo Synth · PC Commander Arcade</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/arcade.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230a0420'/%3E%3Ctext x='50%25' y='58%25' font-size='42' text-anchor='middle' font-family='Arial' fill='%2339ff14'%3E✨%3C/text%3E</svg>">
+  <style>
+    .canvas-wrap { max-width: 960px; border-color: var(--neon-green); box-shadow: 0 0 24px rgba(57, 255, 20, 0.4), inset 0 0 10px rgba(57, 255, 20, 0.2); }
+    .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; justify-content: center; }
+    .controls input[type="text"] {
+      flex: 1 1 320px;
+      max-width: 460px;
+      padding: 10px 14px;
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      background: rgba(0, 0, 0, 0.55);
+      border: 2px solid var(--neon-green);
+      border-radius: 6px;
+      color: #fff;
+      box-shadow: 0 0 8px rgba(57, 255, 20, 0.35), inset 0 0 8px rgba(57, 255, 20, 0.1);
+      outline: none;
+    }
+    .controls input[type="text"]:focus {
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <div id="navHost"></div>
+  <div class="page">
+
+    <div class="hud">
+      <div class="stat"><span class="label">STARS</span><span class="value glow-green" id="totalWords">0</span></div>
+      <div class="stat"><span class="label">RECORD</span><span class="value" id="bestConst">0</span></div>
+      <div class="stat"><span class="label">MODE</span><span class="value glow-cyan">CREATE</span></div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="sky" width="960" height="540"></canvas>
+    </div>
+
+    <div class="controls">
+      <input type="text" id="phrase" placeholder='type a phrase, like "open my computer"' autocomplete="off">
+      <button class="btn green"  id="btnAdd">Add ✦</button>
+      <button class="btn"        id="btnSay">🎤 Speak</button>
+      <button class="btn yellow" id="btnSave">📷 Save PNG</button>
+      <button class="btn pink"   id="btnClear">Clear Sky</button>
+    </div>
+
+    <p class="center muted" style="margin-top: 8px; font-size: 1rem;" id="synthStatus"></p>
+
+    <section class="card mt-3 green">
+      <h3>How it works</h3>
+      <p>Each phrase becomes a <strong>constellation</strong>. Each word becomes a star, sized by its syllable count and length, coloured by its letters. Stars from the same phrase are connected by a line that drifts gently across the sky. Save the result as a poster.</p>
+      <p class="muted">Try: <em>"send good night"</em>, <em>"pause music"</em>, <em>"find my keys"</em>, or your favourite mantra.</p>
+    </section>
+
+  </div>
+
+  <script src="../assets/js/arcade.js"></script>
+  <script src="../assets/js/sfx.js"></script>
+  <script src="../assets/js/voice.js"></script>
+  <script>PCCA.injectNav('echo-synth');</script>
+  <script src="../assets/js/echo-synth.js"></script>
+</body>
+</html>

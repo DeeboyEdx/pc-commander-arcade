@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Push Defender · PC Commander Arcade</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/arcade.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230a0420'/%3E%3Ctext x='50%25' y='58%25' font-size='42' text-anchor='middle' font-family='Arial' fill='%23ff2bd6'%3E🛡%3C/text%3E%3C/svg%3E">
+  <style>
+    #game { max-height: 80vh; }
+    .canvas-wrap { max-width: 480px; }
+    .legend-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 12px; font-family: 'VT323', monospace; font-size: 1.1rem; }
+    .legend-row span { padding: 2px 8px; border-radius: 4px; border: 1px solid currentColor; }
+  </style>
+</head>
+<body>
+  <div id="navHost"></div>
+  <div class="page">
+
+    <div class="hud" aria-label="Game HUD">
+      <div class="stat"><span class="label">SCORE</span><span class="value" id="hudScore">0</span></div>
+      <div class="stat"><span class="label">WAVE</span><span class="value" id="hudWave">–</span></div>
+      <div class="stat"><span class="label">LIVES</span><span class="value glow-pink" id="hudLives">♥♥♥</span></div>
+      <div class="stat"><span class="label">COMBO</span><span class="value" id="hudCombo">1.0x</span></div>
+      <div class="stat"><span class="label">HIGH</span><span class="value" id="hudHigh">0</span></div>
+      <div class="stat"><span class="label">PWR</span><span class="value glow-green" id="hudPower">—</span></div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="game" width="480" height="720" tabindex="0"></canvas>
+      <div class="canvas-overlay" id="overlay">
+        <div id="overlayBody">Loading…</div>
+      </div>
+    </div>
+
+    <div class="legend-row">
+      <span class="glow-cyan">CYAN = real command (let it pass)</span>
+      <span class="glow-pink">PINK = spam (shoot it!)</span>
+    </div>
+
+    <div class="row center mt-2">
+      <span class="muted">Power-ups:</span>
+      <span class="glow-yellow">L</span> Lite – rapid fire
+      <span class="glow-purple" style="color:#b026ff; text-shadow: 0 0 6px #b026ff;">P</span> Plus – triple shot
+      <span class="glow-green">+</span> Courtesy – heal
+      <span class="glow-cyan">B</span> Brief – slow-mo
+    </div>
+
+  </div>
+
+  <script src="../assets/js/arcade.js"></script>
+  <script src="../assets/js/sfx.js"></script>
+  <script>PCCA.injectNav('push-defender');</script>
+  <script src="../assets/js/push-defender.js"></script>
+</body>
+</html>
