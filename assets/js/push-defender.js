@@ -80,6 +80,7 @@
   window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
     if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault();
+    if (e.key === 'ArrowUp' && !e.repeat) tryTractorBeam();
     if (e.key.toLowerCase() === 'p') togglePause();
     if (e.key.toLowerCase() === 'm') toggleMusic();
   });
@@ -129,6 +130,11 @@
     if (game.state === 'playing') tryShoot();
     else if (game.state === 'menu' || game.state === 'gameover') startGame();
   });
+  // Right-click = tractor beam (suppress the browser context menu on canvas)
+  canvas.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    if (game.state === 'playing') tryTractorBeam();
+  });
 
   // ---------- Game state ----------
   const game = {
@@ -156,11 +162,19 @@
     waveDestroyedReal: 0
   };
 
-  // Player
+  // Player ship (defender). The "PC" is a separate stationary floor at the
+  // bottom of the canvas; the ship hovers well above it.
   const player = {
-    x: W / 2, y: H - 56, w: 48, h: 16, speed: 4.6, cooldown: 0,
-    flash: 0
+    x: W / 2, y: H - 130, w: 48, h: 16, speed: 4.6, cooldown: 0,
+    flash: 0,
+    tractorCooldown: 0,
+    tractorBeamUntil: 0,
+    tractorBeamFromX: 0, tractorBeamFromY: 0,
+    tractorBeamToX: 0, tractorBeamToY: 0
   };
+  // PC desk / delivery zone runs from FLOOR_Y to the bottom of the canvas.
+  const FLOOR_Y = H - 56;            // top edge of the PC desk
+  const TERMINATE_Y = FLOOR_Y - 4;   // pushes "land" when their center crosses this
 
   // ---------- Starfield ----------
   for (let i = 0; i < 80; i++) {
@@ -281,6 +295,37 @@
     SFX.laser();
   }
 
+  // ---------- Tractor beam (UP arrow / right-click) ----------
+  // Find the enemy nearest the player's column and yank it straight down to
+  // the delivery floor. No backsies: real push = bonus, spam = lost life.
+  function tryTractorBeam() {
+    const now = performance.now();
+    if (game.state !== 'playing') return;
+    if (player.tractorCooldown > 0) return;
+    if (game.enemies.length === 0) { SFX.badblip(); return; }
+    // Targeting: must be above the player; pick the one whose horizontal
+    // distance to the player is smallest, with a generous ±90px window.
+    let best = null, bestDist = Infinity;
+    for (const e of game.enemies) {
+      if (e.dying || e.tractored) continue;
+      if (e.y >= player.y) continue;       // must be above us
+      const dx = Math.abs(e.x - player.x);
+      if (dx > 90) continue;
+      if (dx < bestDist) { bestDist = dx; best = e; }
+    }
+    if (!best) { SFX.badblip(); return; }
+    best.tractored = true;
+    best.vy = Math.max(best.vy, 28); // dramatic yank
+    best.vx = 0;
+    player.tractorCooldown = 72;     // ~1.2s @ 60fps
+    player.tractorBeamUntil  = now + 220;
+    player.tractorBeamFromX  = player.x;
+    player.tractorBeamFromY  = player.y - 6;
+    player.tractorBeamToX    = best.x;
+    player.tractorBeamToY    = best.y;
+    SFX.pickup();
+  }
+
   // ---------- Power-ups ----------
   function spawnPowerup(x, y) {
     const r = Math.random();
@@ -360,6 +405,7 @@
     if (keys[' '] || keys['space']) tryShoot();
 
     if (player.flash > 0) player.flash--;
+    if (player.tractorCooldown > 0) player.tractorCooldown--;
 
     // Spawn enemies
     if (!game.bossAlive) {
@@ -410,10 +456,10 @@
     }
     game.bullets = game.bullets.filter(b => b.y > -10);
 
-    // Enemy reaches bottom or PC
+    // Enemy reaches the PC delivery floor
     for (const e of game.enemies) {
       if (e.dying) continue;
-      if (e.y > H - 70) {
+      if (e.y > TERMINATE_Y) {
         if (e.type === 'spam') {
           // spam reached PC — lose a life
           game.lives--;
@@ -550,8 +596,14 @@
       ctx.stroke();
     }
 
+    // PC desk / delivery floor (where pushes "land")
+    drawFloor();
+
     // PC base (player tower)
     drawPC();
+
+    // Tractor beam
+    drawTractorBeam();
 
     // Bullets
     for (const b of game.bullets) {
@@ -617,6 +669,60 @@
     }
 
     updateHUD();
+  }
+
+  function drawFloor() {
+    // PC desk / delivery floor. Top edge is the delivery line; anything that
+    // crosses it is "delivered" (real → bonus, spam → life lost).
+    const floorH = H - FLOOR_Y;
+    // Solid desk
+    ctx.fillStyle = 'rgba(8, 4, 28, 0.92)';
+    ctx.fillRect(0, FLOOR_Y, W, floorH);
+    // Subtle horizontal "screen" scanlines
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.05)';
+    for (let yy = FLOOR_Y + 4; yy < H; yy += 6) ctx.fillRect(0, yy, W, 2);
+    // Glowing cyan top edge = delivery line
+    ctx.fillStyle = '#00f0ff';
+    ctx.shadowColor = '#00f0ff'; ctx.shadowBlur = 14;
+    ctx.fillRect(0, FLOOR_Y, W, 2);
+    ctx.shadowBlur = 0;
+    // Small "PC ▼ DELIVER" label so the floor's role is obvious
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(0, 240, 255, 0.75)';
+    ctx.fillText('▼ PC DELIVERY ZONE ▼', 10, H - 6);
+  }
+
+  function drawTractorBeam() {
+    const now = performance.now();
+    if (now >= player.tractorBeamUntil) return;
+    const remain = (player.tractorBeamUntil - now) / 220;
+    const fromX = player.tractorBeamFromX;
+    const fromY = player.tractorBeamFromY;
+    const toX = player.tractorBeamToX;
+    const toY = player.tractorBeamToY;
+    // Conical yellow beam from player upward toward the yanked enemy
+    ctx.save();
+    ctx.globalAlpha = 0.55 * remain;
+    ctx.fillStyle = '#ffe600';
+    ctx.shadowColor = '#ffe600';
+    ctx.shadowBlur = 18;
+    ctx.beginPath();
+    ctx.moveTo(fromX - 6, fromY);
+    ctx.lineTo(fromX + 6, fromY);
+    ctx.lineTo(toX + 22, toY);
+    ctx.lineTo(toX - 22, toY);
+    ctx.closePath();
+    ctx.fill();
+    // Bright core line
+    ctx.globalAlpha = 0.9 * remain;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawPC() {
@@ -763,6 +869,8 @@
     game.floaters = [];
     game.powerup = { type: null, until: 0 };
     game.bossAlive = false;
+    player.tractorCooldown = 0;
+    player.tractorBeamUntil = 0;
     startWave(1);
     MUSIC.start({ bpm: 130 });
   }
@@ -816,7 +924,7 @@
       '<p>Pushes are streaming in from the cloud.</p>' +
       '<p><span class="glow-cyan">CYAN</span> = real commands. Let them reach your PC.<br>' +
       '<span class="glow-pink">PINK</span> = spam. Blast them with <kbd>SPACE</kbd>.</p>' +
-      '<p class="muted" style="font-size:0.95rem;">Move: <kbd>← →</kbd> or <kbd>A D</kbd> · Pause: <kbd>P</kbd> · Mute music: <kbd>M</kbd></p>' +
+      '<p class="muted" style="font-size:0.95rem;">Move: <kbd>← →</kbd> or <kbd>A D</kbd> · Fire: <kbd>SPACE</kbd> · Tractor beam: <kbd>↑</kbd> / right-click · Pause: <kbd>P</kbd></p>' +
       '<p>High score: <span class="glow-yellow">' + PCCA.fmtNum(PCCA.state().highScores.pushDefender || 0) + '</span></p>' +
       '<div class="row center mt-2"><button class="btn pink" id="btnStart">START</button> <a class="btn" href="../index.html">Arcade</a></div>';
     document.getElementById('btnStart').addEventListener('click', startGame);

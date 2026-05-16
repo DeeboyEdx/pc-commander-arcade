@@ -137,8 +137,10 @@
 
   // ---------- Shared nav HTML ----------
   function buildNav(activePage) {
-    const isHome = activePage === 'home';
-    const root = isHome ? '' : '../';
+    // Pages that live at the repo root vs. inside /games/
+    const rootPages = { home: true, about: true };
+    const isAtRoot = !!rootPages[activePage];
+    const root = isAtRoot ? '' : '../';
     return (
       '<div class="nav">' +
       '  <a class="brand" href="' + root + 'index.html">PC&nbsp;Commander&nbsp;Arcade</a>' +

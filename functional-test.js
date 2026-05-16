@@ -186,6 +186,69 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8765';
     if (count < 5) throw new Error('expected at least 5 achievement cards, got ' + count);
   });
 
+  // ---- About: nav links resolve to real pages (root-relative, not ../) ----
+  await check('about: nav links resolve to 200', async (page) => {
+    await page.goto(BASE + '/about.html', { waitUntil: 'networkidle' });
+    const hrefs = await page.$$eval('.nav a', els => els.map(a => a.getAttribute('href')));
+    if (hrefs.length === 0) throw new Error('no nav links found');
+    for (const href of hrefs) {
+      if (href.startsWith('../')) {
+        throw new Error('about.html nav link still uses ../ prefix: ' + href);
+      }
+      const resp = await page.request.get(new URL(href, page.url()).toString());
+      if (resp.status() !== 200) {
+        throw new Error('nav link ' + href + ' returned ' + resp.status());
+      }
+    }
+  });
+
+  // ---- Push Defender: tractor beam yanks an enemy to the floor ----
+  await check('push-defender: tractor beam slams enemy', async (page) => {
+    await page.goto(BASE + '/games/push-defender.html', { waitUntil: 'networkidle' });
+    await page.click('#btnStart');
+    await page.waitForFunction(() => window.__pd && window.__pd.game && window.__pd.game.state === 'playing', { timeout: 3000 });
+    await page.evaluate(() => {
+      const pd = window.__pd;
+      pd.game.enemies.length = 0;
+      pd.game.bullets.length = 0;
+      pd.game.score = 0;
+      pd.game.lives = 3;
+      pd.player.tractorCooldown = 0;
+    });
+    // Spawn a REAL push (cyan) above the player and tractor-beam it
+    const beforeLives = await page.evaluate(() => {
+      const pd = window.__pd;
+      const e = pd._spawnTestEnemy(pd.player.x, 200);
+      e.type = 'real';
+      e._isTest = true;
+      return pd.game.lives;
+    });
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(600); // enemy should slam down and trigger floor logic
+    const after = await page.evaluate(() => {
+      const g = window.__pd.game;
+      const stillAlive = g.enemies.some(e => e._isTest && !e.dying);
+      return { stillAlive, score: g.score, lives: g.lives };
+    });
+    if (after.stillAlive) throw new Error('tractor-beamed real push still alive after 600ms');
+    if (!(after.score > 0)) throw new Error('expected score > 0 after delivering real push, got ' + after.score);
+    if (after.lives !== beforeLives) throw new Error('delivering a real push should not cost a life');
+
+    // Now spawn a SPAM and tractor it: lives should drop
+    await page.evaluate(() => {
+      const pd = window.__pd;
+      pd.game.enemies.length = 0;
+      pd.player.tractorCooldown = 0;
+      const e = pd._spawnTestEnemy(pd.player.x, 200);
+      e.type = 'spam';
+      e._isTest = true;
+    });
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(600);
+    const after2 = await page.evaluate(() => ({ lives: window.__pd.game.lives }));
+    if (after2.lives >= 3) throw new Error('tractor-beaming a spam should cost a life (lives=' + after2.lives + ')');
+  });
+
   await browser.close();
   if (failures) { console.log(`\n${failures} functional test(s) failed.`); process.exit(1); }
   else console.log('\nAll functional tests passed.');
