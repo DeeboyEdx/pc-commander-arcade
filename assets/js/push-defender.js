@@ -71,6 +71,11 @@
   const keys = {};
   let touchActive = false;
   let touchX = W / 2;
+  // Tap-vs-drag detection so sliding to reposition doesn't accidentally fire.
+  let touchStartClientX = 0, touchStartClientY = 0, touchStartT = 0;
+  let touchDragged = false;
+  const TAP_MAX_DIST_PX = 12;   // px in client coords; beyond this, treat as drag
+  const TAP_MAX_TIME_MS = 350;
 
   window.addEventListener('keydown', e => {
     keys[e.key.toLowerCase()] = true;
@@ -80,20 +85,40 @@
   });
   window.addEventListener('keyup',   e => { keys[e.key.toLowerCase()] = false; });
 
-  // Touch: tap to shoot (no drag — fire button mode is more reliable on mobile)
+  // Touch: drag to reposition, *tap* to shoot. A tap is defined as a touch
+  // that moves <12px and ends within 350ms. Anything longer or further
+  // counts as a drag and never fires a shot.
   canvas.addEventListener('touchstart', e => {
     e.preventDefault();
     touchActive = true;
     const r = canvas.getBoundingClientRect();
-    touchX = ((e.touches[0].clientX - r.left) / r.width) * W;
-    if (game.state === 'playing') tryShoot();
+    const t = e.touches[0];
+    touchStartClientX = t.clientX;
+    touchStartClientY = t.clientY;
+    touchStartT = performance.now();
+    touchDragged = false;
+    touchX = ((t.clientX - r.left) / r.width) * W;
   }, { passive: false });
   canvas.addEventListener('touchmove', e => {
     e.preventDefault();
     const r = canvas.getBoundingClientRect();
-    touchX = ((e.touches[0].clientX - r.left) / r.width) * W;
+    const t = e.touches[0];
+    touchX = ((t.clientX - r.left) / r.width) * W;
+    if (!touchDragged) {
+      const dx = t.clientX - touchStartClientX;
+      const dy = t.clientY - touchStartClientY;
+      if (dx * dx + dy * dy > TAP_MAX_DIST_PX * TAP_MAX_DIST_PX) touchDragged = true;
+    }
   }, { passive: false });
-  canvas.addEventListener('touchend', () => { touchActive = false; });
+  canvas.addEventListener('touchend', e => {
+    touchActive = false;
+    const dt = performance.now() - touchStartT;
+    if (!touchDragged && dt < TAP_MAX_TIME_MS) {
+      if (game.state === 'playing') tryShoot();
+      else if (game.state === 'menu' || game.state === 'gameover') startGame();
+    }
+  });
+  canvas.addEventListener('touchcancel', () => { touchActive = false; touchDragged = true; });
 
   // Mouse fallback: click to shoot
   canvas.addEventListener('mousemove', e => {

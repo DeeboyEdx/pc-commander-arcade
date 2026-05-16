@@ -57,22 +57,21 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8765';
       window.__pd.game.bullets.length = 0;
       window.__pd.game.score = 0;
     });
-    // Spawn one enemy directly above the player and fire a bullet straight up.
-    // Mark this specific test enemy so we can find it later, even if natural
-    // spawns add more enemies during the wait.
+    // Spawn one enemy at a known position and a bullet *just below* it so
+    // it collides in the next 1-2 frames, before any naturally-spawned
+    // enemy can intercept the bullet.
     const before = await page.evaluate(() => {
       const pd = window.__pd;
-      const px = pd.player.x;
-      const e = pd._spawnTestEnemy(px, 120);
+      const e = pd._spawnTestEnemy(pd.player.x, 200);
       e._isTest = true;
-      pd._spawnTestBullet(px, pd.player.y - 20);
+      pd._spawnTestBullet(pd.player.x, 230);
       return { enemies: pd.game.enemies.length, bullets: pd.game.bullets.length };
     });
     if (before.enemies !== 1 || before.bullets !== 1) {
       throw new Error('test setup wrong: ' + JSON.stringify(before));
     }
-    // Give the bullet time to fly up ~500px (10 px/frame ≈ 60 frames ≈ 1s)
-    await page.waitForTimeout(1500);
+    // 100ms is ~6 frames — plenty of time for the bullet to traverse 30px
+    await page.waitForTimeout(200);
     const after = await page.evaluate(() => {
       const g = window.__pd.game;
       const testEnemy = g.enemies.find(e => e._isTest);
@@ -89,7 +88,65 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8765';
     }
   });
 
-  // ---- Voice Commander: start a round, type an answer, submit ----
+  // ---- Push Defender: tap fires, drag doesn't (regression) ----
+  await check('push-defender: tap fires, drag does not', async (page) => {
+    // Touch-emulating context
+    const tctx = await browser.newContext({ hasTouch: true, viewport: { width: 700, height: 900 } });
+    const tpage = await tctx.newPage();
+    const errs = [];
+    tpage.on('pageerror', e => errs.push(e.message));
+    await tpage.goto(BASE + '/games/push-defender.html', { waitUntil: 'networkidle' });
+    await tpage.click('#btnStart');
+    await tpage.waitForFunction(() => window.__pd && window.__pd.game && window.__pd.game.state === 'playing', { timeout: 3000 });
+    // Find canvas bounds
+    const box = await tpage.locator('canvas').boundingBox();
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // Reset bullets, then perform a SLIDE (drag) and assert no bullet is fired.
+    await tpage.evaluate(() => { window.__pd.game.bullets.length = 0; });
+    await tpage.touchscreen.tap(cx, cy); // first prime any audio unlock, but this also counts as a tap
+    await tpage.waitForTimeout(50);
+    // clear again, this time test only the drag
+    await tpage.evaluate(() => { window.__pd.game.bullets.length = 0; });
+    // Perform a slow slide that exceeds the tap threshold
+    const slideSteps = 10;
+    await tpage.evaluate(({x, y}) => {
+      const c = document.querySelector('canvas');
+      const r = c.getBoundingClientRect();
+      const ev = new Touch({ identifier: 1, target: c, clientX: x, clientY: y, pageX: x, pageY: y });
+      c.dispatchEvent(new TouchEvent('touchstart', { touches: [ev], targetTouches: [ev], changedTouches: [ev], bubbles: true, cancelable: true }));
+    }, { x: cx, y: cy });
+    for (let i = 1; i <= slideSteps; i++) {
+      const dx = (80 * i) / slideSteps;
+      await tpage.evaluate(({x, y}) => {
+        const c = document.querySelector('canvas');
+        const ev = new Touch({ identifier: 1, target: c, clientX: x, clientY: y, pageX: x, pageY: y });
+        c.dispatchEvent(new TouchEvent('touchmove', { touches: [ev], targetTouches: [ev], changedTouches: [ev], bubbles: true, cancelable: true }));
+      }, { x: cx + dx, y: cy });
+      await tpage.waitForTimeout(20);
+    }
+    await tpage.evaluate(({x, y}) => {
+      const c = document.querySelector('canvas');
+      const ev = new Touch({ identifier: 1, target: c, clientX: x, clientY: y, pageX: x, pageY: y });
+      c.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [ev], bubbles: true, cancelable: true }));
+    }, { x: cx + 80, y: cy });
+    await tpage.waitForTimeout(80);
+    const afterDrag = await tpage.evaluate(() => window.__pd.game.bullets.length);
+    if (afterDrag !== 0) throw new Error('drag fired ' + afterDrag + ' bullet(s); expected 0');
+
+    // Now perform a real tap and assert at least one bullet appears
+    await tpage.evaluate(() => { window.__pd.game.bullets.length = 0; });
+    await tpage.touchscreen.tap(cx, cy);
+    await tpage.waitForTimeout(80);
+    const afterTap = await tpage.evaluate(() => window.__pd.game.bullets.length);
+    if (afterTap < 1) throw new Error('tap did not fire any bullet');
+
+    if (errs.length) throw new Error('page errors: ' + errs.join(' | '));
+    await tctx.close();
+  });
+
+
   await check('voice-commander: start + type + submit', async (page) => {
     await page.goto(BASE + '/games/voice-commander.html', { waitUntil: 'networkidle' });
     // Pick a known language for determinism
