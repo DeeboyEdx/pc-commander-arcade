@@ -247,11 +247,11 @@
     const px = player.x;
     const py = player.y - 6;
     if (game.powerup.type === 'plus' && now < game.powerup.until) {
-      game.bullets.push({ x: px - 10, y: py, vy: -10, vx: -1.2 });
-      game.bullets.push({ x: px,      y: py, vy: -11, vx: 0 });
-      game.bullets.push({ x: px + 10, y: py, vy: -10, vx: 1.2 });
+      game.bullets.push({ x: px - 10, y: py, vy: -10, vx: -1.2, w: 6, h: 14 });
+      game.bullets.push({ x: px,      y: py, vy: -11, vx: 0,    w: 6, h: 14 });
+      game.bullets.push({ x: px + 10, y: py, vy: -10, vx: 1.2,  w: 6, h: 14 });
     } else {
-      game.bullets.push({ x: px, y: py, vy: -10, vx: 0 });
+      game.bullets.push({ x: px, y: py, vy: -10, vx: 0, w: 6, h: 14 });
     }
     SFX.laser();
   }
@@ -800,6 +800,25 @@
   showMenu();
   requestAnimationFrame(loop);
 
-  // Debug hook (safe in prod — just exposes state)
-  window.__pd = { game, player };
+  // Debug hook (safe in prod — just exposes state + a few test helpers)
+  window.__pd = {
+    game, player,
+    // Force-spawn a basic spam enemy at the given x, near the top
+    _spawnTestEnemy(x = W / 2, y = 60) {
+      const e = {
+        type: 'spam', boss: false,
+        text: 'TEST SPAM', x, y, vy: 0, vx: 0,
+        w: 160, h: 30, hp: 1,
+        dying: false, dieT: 0, shake: 0, wob: 0
+      };
+      game.enemies.push(e);
+      return e;
+    },
+    // Force-spawn a bullet at the given x just above the player
+    _spawnTestBullet(x = W / 2, y = H - 80) {
+      const b = { x, y, vy: -10, vx: 0, w: 6, h: 14 };
+      game.bullets.push(b);
+      return b;
+    }
+  };
 })();

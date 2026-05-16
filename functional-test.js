@@ -45,6 +45,50 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8765';
     await page.waitForTimeout(200);
   });
 
+  // ---- Push Defender: bullets must actually hit enemies (regression test) ----
+  await check('push-defender: bullet hits enemy', async (page) => {
+    await page.goto(BASE + '/games/push-defender.html', { waitUntil: 'networkidle' });
+    await page.click('#btnStart');
+    // Wait for game to be in 'playing' state and __pd debug hook exposed
+    await page.waitForFunction(() => window.__pd && window.__pd.game && window.__pd.game.state === 'playing', { timeout: 3000 });
+    // Clear any naturally-spawned enemies and bullets so the test is deterministic
+    await page.evaluate(() => {
+      window.__pd.game.enemies.length = 0;
+      window.__pd.game.bullets.length = 0;
+      window.__pd.game.score = 0;
+    });
+    // Spawn one enemy directly above the player and fire a bullet straight up.
+    // Mark this specific test enemy so we can find it later, even if natural
+    // spawns add more enemies during the wait.
+    const before = await page.evaluate(() => {
+      const pd = window.__pd;
+      const px = pd.player.x;
+      const e = pd._spawnTestEnemy(px, 120);
+      e._isTest = true;
+      pd._spawnTestBullet(px, pd.player.y - 20);
+      return { enemies: pd.game.enemies.length, bullets: pd.game.bullets.length };
+    });
+    if (before.enemies !== 1 || before.bullets !== 1) {
+      throw new Error('test setup wrong: ' + JSON.stringify(before));
+    }
+    // Give the bullet time to fly up ~500px (10 px/frame ≈ 60 frames ≈ 1s)
+    await page.waitForTimeout(1500);
+    const after = await page.evaluate(() => {
+      const g = window.__pd.game;
+      const testEnemy = g.enemies.find(e => e._isTest);
+      return {
+        testEnemyStillAlive: !!(testEnemy && !testEnemy.dying),
+        score: g.score
+      };
+    });
+    if (after.testEnemyStillAlive) {
+      throw new Error('bullet did not kill the test enemy — collision broken');
+    }
+    if (!(after.score > 0)) {
+      throw new Error('expected score > 0 after kill, got ' + after.score);
+    }
+  });
+
   // ---- Voice Commander: start a round, type an answer, submit ----
   await check('voice-commander: start + type + submit', async (page) => {
     await page.goto(BASE + '/games/voice-commander.html', { waitUntil: 'networkidle' });
