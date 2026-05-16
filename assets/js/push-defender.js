@@ -296,28 +296,38 @@
   }
 
   // ---------- Tractor beam (UP arrow / right-click) ----------
-  // Find the enemy nearest the player's column and yank it straight down to
-  // the delivery floor. No backsies: real push = bonus, spam = lost life.
+  // Pull the *first* push directly in front of (above) the ship straight
+  // down. Targeting is a narrow vertical column the width of the ship's
+  // turret — an enemy qualifies only if its hitbox overlaps that column.
+  // Among qualifying enemies, pick the one with the greatest y (closest
+  // to the ship). No backsies: real = bonus, spam = lost life.
+  const TRACTOR_BEAM_HALF_WIDTH = 6;
   function tryTractorBeam() {
     const now = performance.now();
     if (game.state !== 'playing') return;
     if (player.tractorCooldown > 0) return;
     if (game.enemies.length === 0) { SFX.badblip(); return; }
-    // Targeting: must be above the player; pick the one whose horizontal
-    // distance to the player is smallest, with a generous ±90px window.
-    let best = null, bestDist = Infinity;
+    const colMin = player.x - TRACTOR_BEAM_HALF_WIDTH;
+    const colMax = player.x + TRACTOR_BEAM_HALF_WIDTH;
+    let best = null;
     for (const e of game.enemies) {
       if (e.dying || e.tractored) continue;
-      if (e.y >= player.y) continue;       // must be above us
-      const dx = Math.abs(e.x - player.x);
-      if (dx > 90) continue;
-      if (dx < bestDist) { bestDist = dx; best = e; }
+      if (e.y >= player.y) continue;          // must be above the ship
+      const eLeft  = e.x - e.w / 2;
+      const eRight = e.x + e.w / 2;
+      // Column overlap test: any part of the beam column intersects this enemy
+      if (eRight < colMin || eLeft > colMax) continue;
+      // Pick the enemy nearest to the ship (largest y). Tiebreak by
+      // smallest horizontal offset so the visual beam points sensibly.
+      if (!best || e.y > best.y || (e.y === best.y && Math.abs(e.x - player.x) < Math.abs(best.x - player.x))) {
+        best = e;
+      }
     }
     if (!best) { SFX.badblip(); return; }
     best.tractored = true;
-    best.vy = Math.max(best.vy, 28); // dramatic yank
+    best.vy = Math.max(best.vy, 28);
     best.vx = 0;
-    player.tractorCooldown = 72;     // ~1.2s @ 60fps
+    player.tractorCooldown = 72;
     player.tractorBeamUntil  = now + 220;
     player.tractorBeamFromX  = player.x;
     player.tractorBeamFromY  = player.y - 6;
@@ -701,17 +711,17 @@
     const fromY = player.tractorBeamFromY;
     const toX = player.tractorBeamToX;
     const toY = player.tractorBeamToY;
-    // Conical yellow beam from player upward toward the yanked enemy
+    // Narrow yellow beam matching the tight column the targeter uses
     ctx.save();
     ctx.globalAlpha = 0.55 * remain;
     ctx.fillStyle = '#ffe600';
     ctx.shadowColor = '#ffe600';
     ctx.shadowBlur = 18;
     ctx.beginPath();
-    ctx.moveTo(fromX - 6, fromY);
-    ctx.lineTo(fromX + 6, fromY);
-    ctx.lineTo(toX + 22, toY);
-    ctx.lineTo(toX - 22, toY);
+    ctx.moveTo(fromX - 4, fromY);
+    ctx.lineTo(fromX + 4, fromY);
+    ctx.lineTo(toX + TRACTOR_BEAM_HALF_WIDTH, toY);
+    ctx.lineTo(toX - TRACTOR_BEAM_HALF_WIDTH, toY);
     ctx.closePath();
     ctx.fill();
     // Bright core line

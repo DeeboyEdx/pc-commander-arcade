@@ -249,6 +249,48 @@ const BASE = process.env.BASE_URL || 'http://127.0.0.1:8765';
     if (after2.lives >= 3) throw new Error('tractor-beaming a spam should cost a life (lives=' + after2.lives + ')');
   });
 
+  // ---- Push Defender: tractor beam picks the FIRST enemy in front, not
+  // ----   a more-centered one further away (regression for "pulled bad
+  // ----   push from behind a good push")
+  await check('push-defender: tractor targets nearest enemy in column', async (page) => {
+    await page.goto(BASE + '/games/push-defender.html', { waitUntil: 'networkidle' });
+    await page.click('#btnStart');
+    await page.waitForFunction(() => window.__pd && window.__pd.game && window.__pd.game.state === 'playing', { timeout: 3000 });
+    await page.evaluate(() => {
+      const pd = window.__pd;
+      pd.game.enemies.length = 0;
+      pd.game.bullets.length = 0;
+      pd.game.score = 0;
+      pd.game.lives = 3;
+      pd.player.tractorCooldown = 0;
+      const px = pd.player.x;
+      // SPAM, higher up, perfectly centered on the player
+      const upper = pd._spawnTestEnemy(px, 120);
+      upper.type = 'spam';
+      upper.tag = 'upper-spam';
+      // REAL, lower (closer to player), slightly offset — still inside
+      // its own hitbox over the column though, so it should be the pick
+      const lower = pd._spawnTestEnemy(px + 30, 300);
+      lower.type = 'real';
+      lower.tag = 'lower-real';
+    });
+    await page.keyboard.press('ArrowUp');
+    // Find which one got tractored within a short window
+    await page.waitForTimeout(120);
+    const tagged = await page.evaluate(() => {
+      const g = window.__pd.game;
+      const t = g.enemies.find(e => e.tractored);
+      return t ? t.tag : null;
+    });
+    if (tagged !== 'lower-real') {
+      throw new Error("tractor beam should have targeted the closer 'lower-real', got: " + tagged);
+    }
+    // And after it lands, confirm no life lost (it was a real push)
+    await page.waitForTimeout(500);
+    const lives = await page.evaluate(() => window.__pd.game.lives);
+    if (lives !== 3) throw new Error('lives should be 3 (delivered a real), got ' + lives);
+  });
+
   await browser.close();
   if (failures) { console.log(`\n${failures} functional test(s) failed.`); process.exit(1); }
   else console.log('\nAll functional tests passed.');
